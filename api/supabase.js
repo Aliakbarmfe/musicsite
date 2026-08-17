@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
 
   const { action } = req.query;
 
-  // دریافت لیست آهنگ‌ها
+  // ۱. دریافت لیست آهنگ‌ها
   if (action === 'get-songs') {
     try {
       const { data, error } = await supabase
@@ -35,19 +35,10 @@ module.exports = async (req, res) => {
     }
   }
 
-  // ورود مدیر
+  // ۲. ورود مدیر
   if (action === 'login') {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
     try {
       const { username, password } = req.body;
-
-      if (!username || !password) {
-        return res.status(400).json({ success: false, message: 'اطلاعات کامل نیست' });
-      }
-
       const { data, error } = await supabase
         .from('admins')
         .select('*')
@@ -65,5 +56,48 @@ module.exports = async (req, res) => {
     }
   }
 
+  // ۳. ویرایش نام آهنگ
+  if (action === 'edit-song') {
+    try {
+      const { id, title } = req.body;
+      const { error } = await supabase.from('songs').update({ title }).eq('id', id);
+      if (error) return res.status(500).json({ success: false, message: error.message });
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: 'خطا در ویرایش آهنگ' });
+    }
+  }
+
+  // ۴. حذف آهنگ
+  if (action === 'delete-song') {
+    try {
+      const { id, fileName } = req.body;
+      if (fileName) {
+        await supabase.storage.from('songs').remove([fileName]);
+      }
+      const { error } = await supabase.from('songs').delete().eq('id', id);
+      if (error) return res.status(500).json({ success: false, message: error.message });
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: 'خطا در حذف آهنگ' });
+    }
+  }
+
+  // ۵. تغییر اطلاعات مدیر
+  if (action === 'update-admin') {
+    try {
+      const { username, password } = req.body;
+      const { data: admins } = await supabase.from('admins').select('id').limit(1);
+      if (admins && admins.length > 0) {
+        await supabase.from('admins').update({ username, password }).eq('id', admins[0].id);
+        return res.status(200).json({ success: true });
+      }
+      return res.status(404).json({ success: false, message: 'مدیر یافت نشد' });
+    } catch (err) {
+      return res.status(500).json({ success: false, message: 'خطا در به روزرسانی اطلاعات' });
+    }
+  }
+
   return res.status(400).json({ error: 'اکشن معتبر نیست' });
 };
+        
