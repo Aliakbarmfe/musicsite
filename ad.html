@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>پنل مدیریت - مجموعه بهار</title>
+  <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Vazirmatn', sans-serif; }
+    body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+    
+    /* Top Header */
+    .admin-header { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .btn { background: #38bdf8; color: #0f172a; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+    .btn:hover { background: #0284c7; color: #fff; }
+    .btn-danger { background: #f43f5e; color: #fff; }
+    .btn-danger:hover { background: #e11d48; }
+    .add-btn { font-size: 1.4rem; padding: 2px 14px; line-height: 1; }
+
+    /* Song List */
+    .song-list { width: 100%; max-width: 600px; display: flex; flex-direction: column; gap: 15px; }
+    .song-card { background: #1e293b; padding: 16px; border-radius: 12px; border: 1px solid #334155; display: flex; flex-direction: column; gap: 10px; }
+    .song-title { font-size: 1.05rem; font-weight: bold; color: #f8fafc; }
+    .card-actions { display: flex; gap: 10px; margin-top: 5px; }
+    .card-actions button { flex: 1; padding: 8px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+    .edit-btn { background: #f59e0b; color: #0f172a; }
+    .delete-btn { background: #ef4444; color: #fff; }
+
+    /* Modals */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); z-index: 1000; }
+    .modal { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .modal h3 { margin-bottom: 15px; color: #38bdf8; font-size: 1.1rem; }
+    .modal input[type="text"], .modal input[type="password"], .modal input[type="file"] { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #fff; outline: none; }
+    .modal input[type="file"] { display: none; }
+    .file-label { display: block; padding: 12px; background: #334155; border-radius: 8px; cursor: pointer; color: #cbd5e1; margin: 8px 0; border: 1px dashed #38bdf8; }
+    .modal button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+    .close-btn { background: #475569; color: #fff; margin-top: 8px; }
+
+    /* Upload Progress */
+    .progress-box { display: none; margin-top: 15px; }
+    .progress-bar-bg { width: 100%; height: 12px; background: #0f172a; border-radius: 6px; overflow: hidden; border: 1px solid #334155; }
+    .progress-bar-fill { width: 0%; height: 100%; background: #38bdf8; transition: width 0.2s; }
+    .progress-text { font-size: 0.85rem; color: #cbd5e1; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-header">
+    <button class="btn add-btn" onclick="openModal('addModal')" title="افزودن آهنگ">+</button>
+    <button class="btn" onclick="openAdminInfoModal()">اطلاعات مدیر</button>
+    <button class="btn btn-danger" onclick="logout()">خروج</button>
+  </div>
+
+  <div class="song-list" id="songContainer">
+    <p style="text-align:center; color:#94a3b8;">در حال دریافت آهنگ‌ها...</p>
+  </div>
+
+  <!-- Add Song Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <h3>افزودن آهنگ جدید</h3>
+      <input type="text" id="songTitleInput" placeholder="اسم آهنگ">
+      <label class="file-label" for="audioFileInput" id="fileLabel">انتخاب فایل آهنگ (MP3)</label>
+      <input type="file" id="audioFileInput" accept="audio/*" onchange="updateFileName()">
+      
+      <div class="progress-box" id="progressBox">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+        <div class="progress-text" id="progressText">0%</div>
+      </div>
+
+      <button class="btn" id="uploadBtn" onclick="uploadSong()">آپلود و ذخیره</button>
+      <button class="btn close-btn" id="closeAddBtn" onclick="closeModal('addModal')">انصراف</button>
+    </div>
+  </div>
+
+  <!-- Edit Title Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3>ویرایش اسم آهنگ</h3>
+      <input type="text" id="editTitleInput" placeholder="اسم جدید آهنگ">
+      <button class="btn" onclick="saveEditedTitle()">ذخیره تغییرات</button>
+      <button class="btn close-btn" onclick="closeModal('editModal')">انصراف</button>
+    </div>
+  </div>
+
+  <!-- Admin Info Modal -->
+  <div class="modal-overlay" id="adminInfoModal">
+    <div class="modal">
+      <h3>تغییر اطلاعات مدیر</h3>
+      <input type="text" id="newUsername" placeholder="نام کاربری جدید">
+      <input type="password" id="newPassword" placeholder="رمز عبور جدید">
+      <button class="btn" onclick="updateAdminInfo()">به‌روزرسانی</button>
+      <button class="btn close-btn" onclick="closeModal('adminInfoModal')">انصراف</button>
+    </div>
+  </div>
+
+  <!-- Custom Alert Modal -->
+  <div class="modal-overlay" id="alertModal">
+    <div class="modal">
+      <h3 id="alertTitle">پیام</h3>
+      <p id="alertMessage" style="color:#cbd5e1; margin-bottom:15px; font-size:0.95rem;"></p>
+      <button class="btn" onclick="closeModal('alertModal')">تایید</button>
+    </div>
+  </div>
+
+  <script>
+    // Supabase Config
+    const SUPABASE_URL = "https://eatsufmguejxdbklpltp.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhdHN1Zm1ndWVqeGRia2xwbHRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NjE5NjQsImV4cCI6MjEwMjUzNzk2NH0.WXbD04nD820j_Dz0VVYqbPQIn26R5nyhG_Ce8_6CcBc";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentEditId = null;
+
+    // Protection against back/refresh
+    if (!sessionStorage.getItem('adminToken')) {
+      window.location.href = 'index.html';
+    }
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () { history.go(1); };
+    window.onbeforeunload = function () { return "آیا از خروج اطمینان دارید؟"; };
+
+    function logout() {
+      window.onbeforeunload = null;
+      sessionStorage.removeItem('adminToken');
+      window.location.href = 'index.html';
+    }
+
+    function showAlert(title, msg) {
+      document.getElementById('alertTitle').innerText = title;
+      document.getElementById('alertMessage').innerText = msg;
+      openModal('alertModal');
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function updateFileName() {
+      const file = document.getElementById('audioFileInput').files[0];
+      if (file) {
+        document.getElementById('fileLabel').innerText = file.name;
+      }
+    }
+
+    async function fetchAdminSongs() {
+      const container = document.getElementById('songContainer');
+      try {
+        const { data: songs, error } = await supabaseClient.from('songs').select('*').order('created_at', { ascending: false });
+        container.innerHTML = '';
+
+        if (error || !songs || songs.length === 0) {
+          container.innerHTML = '<p style="text-align:center; color:#94a3b8;">آهنگی موجود نیست.</p>';
+          return;
+        }
+
+        songs.forEach(song => {
+          const card = document.createElement('div');
+          card.className = 'song-card';
+          card.innerHTML = `
+            <div class="song-title">${song.title}</div>
+            <audio controls src="${song.audio_url}" style="width:100%; height:36px;"></audio>
+            <div class="card-actions">
+              <button class="edit-btn" onclick="openEditModal('${song.id}', '${song.title}')">ویرایش اسم</button>
+              <button class="delete-btn" onclick="deleteSong('${song.id}', '${song.audio_url}')">حذف</button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (e) {
+        container.innerHTML = '<p style="text-align:center; color:#ef4444;">خطا در برقراری ارتباط</p>';
+      }
+    }
+
+    async function uploadSong() {
+      const title = document.getElementById('songTitleInput').value.trim();
+      const fileInput = document.getElementById('audioFileInput');
+      const file = fileInput.files[0];
+
+      if (!title || !file) {
+        showAlert('خطا', 'لطفاً نام آهنگ و فایل را انتخاب کنید.');
+        return;
+      }
+
+      const uploadBtn = document.getElementById('uploadBtn');
+      const closeAddBtn = document.getElementById('closeAddBtn');
+      const progressBox = document.getElementById('progressBox');
+      const progressFill = document.getElementById('progressFill');
+      const progressText = document.getElementById('progressText');
+
+      uploadBtn.disabled = true;
+      closeAddBtn.disabled = true;
+      progressBox.style.display = 'block';
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+
+      // Simulated Upload Animation with Supabase Storage Upload
+      let percent = 0;
+      const progressInterval = setInterval(() => {
+        if (percent < 90) {
+          percent += 10;
+          progressFill.style.width = percent + '%';
+          const uploadedMB = ((file.size * (percent / 100)) / (1024 * 1024)).toFixed(2);
+          progressText.innerText = `حجم: ${fileSizeMB}MB | آپلود شده: ${uploadedMB}MB (${percent}%)`;
+        }
+      }, 200);
+
+      const { data: storageData, error: storageError } = await supabaseClient.storage.from('songs').upload(fileName, file);
+
+      clearInterval(progressInterval);
+
+      if (storageError) {
+        uploadBtn.disabled = false;
+        closeAddBtn.disabled = false;
+        progressBox.style.display = 'none';
+        showAlert('خطا', 'خطا در آپلود فایل: ' + storageError.message);
+        return;
+      }
+
+      progressFill.style.width = '100%';
+      progressText.innerText = `حجم: ${fileSizeMB}MB | آپلود شد! (100%)`;
+
+      const { data: publicUrlData } = supabaseClient.storage.from('songs').getPublicUrl(fileName);
+      const audioUrl = publicUrlData.publicUrl;
+
+      await supabaseClient.from('songs').insert([{ title: title, audio_url: audioUrl }]);
+
+      setTimeout(() => {
+        uploadBtn.disabled = false;
+        closeAddBtn.disabled = false;
+        progressBox.style.display = 'none';
+        progressFill.style.width = '0%';
+        document.getElementById('songTitleInput').value = '';
+        fileInput.value = '';
+        document.getElementById('fileLabel').innerText = 'انتخاب فایل آهنگ (MP3)';
+        closeModal('addModal');
+        showAlert('موفقیت', 'آهنگ با موفقیت آپلود و اضافه شد!');
+        fetchAdminSongs();
+      }, 500);
+    }
+
+    function openEditModal(id, currentTitle) {
+      currentEditId = id;
+      document.getElementById('editTitleInput').value = currentTitle;
+      openModal('editModal');
+    }
+
+    async function saveEditedTitle() {
+      const newTitle = document.getElementById('editTitleInput').value.trim();
+      if (!newTitle) return;
+
+      await supabaseClient.from('songs').update({ title: newTitle }).eq('id', currentEditId);
+      closeModal('editModal');
+      showAlert('موفقیت', 'اسم آهنگ ویرایش شد.');
+      fetchAdminSongs();
+    }
+
+    async function deleteSong(id, audioUrl) {
+      if (!confirm('آیا از حذف این آهنگ اطمینان دارید؟')) return;
+
+      const urlParts = audioUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      await supabaseClient.storage.from('songs').remove([fileName]);
+      await supabaseClient.from('songs').delete().eq('id', id);
+
+      showAlert('حذف شد', 'آهنگ با موفقیت حذف شد.');
+      fetchAdminSongs();
+    }
+
+    function openAdminInfoModal() {
+      openModal('adminInfoModal');
+    }
+
+    async function updateAdminInfo() {
+      const newUser = document.getElementById('newUsername').value.trim();
+      const newPass = document.getElementById('newPassword').value.trim();
+
+      if (!newUser || !newPass) {
+        showAlert('خطا', 'لطفاً تمام فیلدها را پر کنید.');
+        return;
+      }
+
+      const { data: admins } = await supabaseClient.from('admins').select('id').limit(1);
+      if (admins && admins.length > 0) {
+        await supabaseClient.from('admins').update({ username: newUser, password: newPass }).eq('id', admins[0].id);
+        closeModal('adminInfoModal');
+        showAlert('موفقیت', 'اطلاعات مدیر با موفقیت به روزرسانی شد.');
+      }
+    }
+
+    fetchAdminSongs();
+  </script>
+</body>
+  </html>
+  
