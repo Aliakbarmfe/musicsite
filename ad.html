@@ -145,10 +145,11 @@
     async function fetchAdminSongs() {
       const container = document.getElementById('songContainer');
       try {
-        const { data: songs, error } = await supabaseClient.from('songs').select('*').order('created_at', { ascending: false });
+        const res = await fetch('/api/supabase?action=get-songs');
+        const songs = await res.json();
         container.innerHTML = '';
 
-        if (error || !songs || songs.length === 0) {
+        if (!songs || songs.length === 0) {
           container.innerHTML = '<p style="text-align:center; color:#94a3b8;">آهنگی موجود نیست.</p>';
           return;
         }
@@ -195,7 +196,6 @@
       const fileName = `${Date.now()}.${fileExt}`;
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
-      // Simulated Upload Animation with Supabase Storage Upload
       let percent = 0;
       const progressInterval = setInterval(() => {
         if (percent < 90) {
@@ -250,10 +250,24 @@
       const newTitle = document.getElementById('editTitleInput').value.trim();
       if (!newTitle) return;
 
-      await supabaseClient.from('songs').update({ title: newTitle }).eq('id', currentEditId);
-      closeModal('editModal');
-      showAlert('موفقیت', 'اسم آهنگ ویرایش شد.');
-      fetchAdminSongs();
+      try {
+        const res = await fetch('/api/supabase?action=edit-song', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id: currentEditId, title: newTitle })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          closeModal('editModal');
+          showAlert('موفقیت', 'اسم آهنگ ویرایش شد.');
+          fetchAdminSongs();
+        } else {
+          showAlert('خطا', data.message || 'خطا در ویرایش اسم آهنگ');
+        }
+      } catch(e) {
+        showAlert('خطا', 'مشکل در برقراری ارتباط با سرور');
+      }
     }
 
     async function deleteSong(id, audioUrl) {
@@ -262,11 +276,23 @@
       const urlParts = audioUrl.split('/');
       const fileName = urlParts[urlParts.length - 1];
 
-      await supabaseClient.storage.from('songs').remove([fileName]);
-      await supabaseClient.from('songs').delete().eq('id', id);
+      try {
+        const res = await fetch('/api/supabase?action=delete-song', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id: id, fileName: fileName })
+        });
+        const data = await res.json();
 
-      showAlert('حذف شد', 'آهنگ با موفقیت حذف شد.');
-      fetchAdminSongs();
+        if (res.ok && data.success) {
+          showAlert('حذف شد', 'آهنگ با موفقیت حذف شد.');
+          fetchAdminSongs();
+        } else {
+          showAlert('خطا', data.message || 'خطا در حذف آهنگ');
+        }
+      } catch(e) {
+        showAlert('خطا', 'مشکل در برقراری ارتباط با سرور');
+      }
     }
 
     function openAdminInfoModal() {
@@ -282,11 +308,22 @@
         return;
       }
 
-      const { data: admins } = await supabaseClient.from('admins').select('id').limit(1);
-      if (admins && admins.length > 0) {
-        await supabaseClient.from('admins').update({ username: newUser, password: newPass }).eq('id', admins[0].id);
-        closeModal('adminInfoModal');
-        showAlert('موفقیت', 'اطلاعات مدیر با موفقیت به روزرسانی شد.');
+      try {
+        const res = await fetch('/api/supabase?action=update-admin', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username: newUser, password: newPass })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          closeModal('adminInfoModal');
+          showAlert('موفقیت', 'اطلاعات مدیر با موفقیت به روزرسانی شد.');
+        } else {
+          showAlert('خطا', data.message || 'خطا در بروزرسانی اطلاعات مدیر');
+        }
+      } catch(e) {
+        showAlert('خطا', 'مشکل در برقراری ارتباط با سرور');
       }
     }
 
