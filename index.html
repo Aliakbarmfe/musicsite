@@ -87,17 +87,22 @@
       color: #E0E0E0; 
     }
 
-    /* ۵. جزئیات و آکسان‌ها: رنگ طلایی #FFD700 برای آیکون‌ها و لینک‌های مهم */
-    .channels a { 
+    /* ۵. جزئیات و آکسان‌ها: رنگ طلایی #FFD700 برای آیکون‌ها و آیدی‌های قابل کپی */
+    .channels .copy-tag { 
       color: #FFD700; 
-      text-decoration: none; 
+      cursor: pointer;
       font-weight: bold; 
       text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
-      transition: color 0.3s ease;
+      transition: all 0.3s ease;
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      direction: ltr;
     }
-    .channels a:hover {
+    .channels .copy-tag:hover {
       color: #00F3FF;
       text-shadow: 0 0 8px rgba(0, 243, 255, 0.8);
+      background: rgba(0, 243, 255, 0.1);
     }
 
     .song-list { 
@@ -137,7 +142,7 @@
       width: 100%; 
       height: 40px; 
       border-radius: 8px; 
-      filter: invert(0.9) hue-rotate(180deg); /* هماهنگ‌سازی استایل پلیر مرورگر با تم تاریک */
+      filter: invert(0.9) hue-rotate(180deg);
     }
 
     /* ۴. دکمه اصلی دانلود: گرادینت بنفش به فیروزه‌ای */
@@ -204,7 +209,6 @@
       box-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
     }
 
-    /* دکمه‌های فرم داخل مدال */
     .btn {
       width: 100%; 
       padding: 12px; 
@@ -223,7 +227,6 @@
       box-shadow: 0 0 15px rgba(0, 243, 255, 0.7);
     }
 
-    /* دکمه ثانویه بستن/انصراف: حالت شیشه‌ای با حاشیه بنفش */
     .btn-close { 
       background: rgba(16, 16, 16, 0.6); 
       border: 1px solid #8A2BE2;
@@ -237,6 +240,34 @@
       color: #FFFFFF;
       box-shadow: 0 0 10px rgba(138, 43, 226, 0.4);
     }
+
+    /* استایل پیام اعلان کپی نئونی (Toast Notification) */
+    .toast-notification {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(16, 16, 16, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid #00F3FF;
+      color: #FFFFFF;
+      padding: 12px 24px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.5), 0 0 10px rgba(138, 43, 226, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      z-index: 2000;
+      pointer-events: none;
+    }
+    .toast-notification.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
@@ -246,10 +277,10 @@
     <h1>خوش اومدی به مجموعه آهنگ بهار 😎</h1>
     <div class="header-line"></div>
     <div class="channels">
-      <p>شعبه 1😍 <a href="https://t.me/BAHARM100" target="_blank">@BAHARM100</a></p>
-      <p>شعبه 2😍 <a href="https://t.me/BAHARM200" target="_blank">@BAHARM200</a></p>
-      <p>ربات مجموعه هم تقدیم شما 😍😎 <a href="https://t.me/bot_tablighat_81bot" target="_blank">@bot_tablighat_81bot</a></p>
-      <p>مدیریت سایت و مالک 😎 <a href="https://t.me/OxenMOxen_210" target="_blank">@OxenMOxen_210</a></p>
+      <p>شعبه 1😍 <span class="copy-tag" onclick="copyText('@BAHARM100')">@BAHARM100</span></p>
+      <p>شعبه 2😍 <span class="copy-tag" onclick="copyText('@BAHARM200')">@BAHARM200</span></p>
+      <p>ربات مجموعه هم تقدیم شما 😍😎 <span class="copy-tag" onclick="copyText('@bot_tablighat_81bot')">@bot_tablighat_81bot</span></p>
+      <p>مدیریت سایت و مالک 😎 <span class="copy-tag" onclick="copyText('@OxenMOxen_210')">@OxenMOxen_210</span></p>
     </div>
   </div>
 
@@ -278,7 +309,43 @@
     </div>
   </div>
 
+  <!-- Toast Notification Box -->
+  <div class="toast-notification" id="toast">
+    <span>✨</span>
+    <span id="toastMessage">کپی شد!</span>
+  </div>
+
   <script>
+    /* تابع اختصاصی کپی در حافظه و نمایش اعلان نئونی */
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`آیدی ${text} کپی شد! ✨`);
+      }).catch(err => {
+        // روش جایگزین برای مرورگرهای قدیمی‌تر
+        const tempInput = document.createElement('input');
+        tempInput.value = text;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        showToast(`آیدی ${text} کپی شد! ✨`);
+      });
+    }
+
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      toastMsg.innerText = message;
+      
+      toast.classList.add('show');
+      
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
     async function fetchSongs() {
       try {
         const res = await fetch('/api/get-songs');
